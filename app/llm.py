@@ -17,15 +17,18 @@ except ImportError:
 SYSTEM_ROUTER_PROMPT = """
 You are a tool routing classifier.
 Determine whether the user query requires database SQL, business policy lookup, or both.
+If the query is nonsense, empty, or unrelated, mark it as unknown.
 
 Definitions:
 - SQL: direct DB queries, counts, sums, joins, filters.
 - Policy: business rules defined in policies.md (VIP rules, return rules, restocking fee, shipping rules)
+- Unknown: junk/unrelated/empty input; do not route to SQL or policy.
 
 Output ONLY a function call with:
 {
    "requires_sql": true/false,
    "requires_policy": true/false,
+   "unknown": true/false,
    "explanation": "brief reasoning"
 }
 """.strip()
@@ -36,6 +39,7 @@ CLASSIFY_SCHEMA = {
         "requires_sql": {"type": "boolean"},
         "requires_policy": {"type": "boolean"},
         "explanation": {"type": "string"},
+        "unknown": {"type": "boolean"},
     },
     "required": ["requires_sql", "requires_policy"],
 }
@@ -47,9 +51,12 @@ class Classification:
     requires_policy: bool
     explanation: str = ""
     source: str = "heuristic"
+    unknown: bool = False
 
     @property
     def decision(self) -> str:
+        if self.unknown:
+            return "unknown"
         if self.requires_sql and self.requires_policy:
             return "hybrid"
         if self.requires_policy:
@@ -65,6 +72,7 @@ class Classification:
             "explanation": self.explanation,
             "decision": self.decision,
             "source": self.source,
+            "unknown": self.unknown,
         }
 
 
@@ -112,7 +120,7 @@ class LLMClient:
         - policy keyword hit → requires_policy = True (NOT SQL!)
         - LLM decides requires_sql / requires_policy
         - Final routing merges both
-        
+
         This avoids mistakes like:
         "Give me the VIP definition" → docs (correct)
         "List VIP customers" → hybrid (correct)
@@ -144,6 +152,7 @@ class LLMClient:
             requires_policy=merged_requires_policy,
             explanation=llm_cls.explanation,
             source="merged",
+            unknown=llm_cls.unknown,
         )
 
         return self._log_classification(query, final)
@@ -304,6 +313,7 @@ class LLMClient:
         requires_sql = True
         requires_policy = False
         explanation = ""
+        unknown = False
 
         resp = self._chat(messages, tools=tools_spec)
         tool_calls = resp["choices"][0]["message"].get("tool_calls", [])
@@ -314,17 +324,27 @@ class LLMClient:
                 requires_sql = bool(payload.get("requires_sql", True))
                 requires_policy = bool(payload.get("requires_policy", False))
                 explanation = payload.get("explanation", "")
+                unknown = bool(payload.get("unknown", False))
             except (json.JSONDecodeError, TypeError, ValueError):
-                pass
+                unknown = False
 
         return Classification(
             requires_sql=requires_sql,
             requires_policy=requires_policy,
             explanation=explanation,
             source="llm",
+            unknown=unknown,
         )
 
     def _heuristic_classification(self, query: str) -> Classification:
+        if self._is_nonsense(query):
+            return Classification(
+                requires_sql=False,
+                requires_policy=False,
+                source="heuristic",
+                explanation="Query is empty or not understandable.",
+                unknown=True,
+            )
         requires_policy = keyword_match(query, ["policy", "rule", "guideline"])
         requires_sql = not requires_policy or keyword_match(
             query, ["count", "list", "sum", "order", "customer", "product", "revenue", "amount"]
@@ -333,7 +353,15 @@ class LLMClient:
             requires_sql=requires_sql,
             requires_policy=requires_policy,
             source="heuristic",
+            unknown=False,
         )
+
+    def _is_nonsense(self, query: str) -> bool:
+        trimmed = query.strip()
+        if not trimmed:
+            return True
+        # If there are no letters or digits, it's nonsense (e.g., "!!!???").
+        return not any(ch.isalnum() for ch in trimmed)
 
     def _log_classification(self, query: str, classification: Classification) -> Dict[str, Any]:
         tools = classification.to_dict()

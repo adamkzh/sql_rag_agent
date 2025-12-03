@@ -31,6 +31,7 @@ class Router:
             "normalized_query": normalized_query,
             "requires_sql": bool(tools.get("requires_sql", False)),
             "requires_policy": bool(tools.get("requires_policy", False)),
+            "unknown": bool(tools.get("unknown", False)),
             "decision": decision if decision != "None" else self._infer_decision(tools),
             "source": str(tools.get("source", "router")),
             "explanation": str(tools.get("explanation", "")),
@@ -39,6 +40,8 @@ class Router:
         return payload
 
     def _infer_decision(self, tools: Dict[str, str | bool]) -> str:
+        if bool(tools.get("unknown", False)):
+            return "unknown"
         requires_sql = bool(tools.get("requires_sql", False))
         requires_policy = bool(tools.get("requires_policy", False))
         if requires_sql and requires_policy:

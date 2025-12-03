@@ -40,8 +40,11 @@ class Agent:
             decision=decision,
             requires_sql=bool(route_info.get("requires_sql")),
             requires_policy=bool(route_info.get("requires_policy")),
+            unknown=bool(route_info.get("unknown")),
         )
 
+        if route_info.get("unknown"):
+            return {"message": "I couldn't understand that request. Please rephrase or ask a specific question."}
         if decision == "docs":
             return self._handle_docs_case(query)
         if decision == "hybrid":
