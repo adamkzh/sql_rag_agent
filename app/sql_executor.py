@@ -5,7 +5,13 @@ from typing import Any, Dict, List, Tuple
 
 from app.llm import LLMClient
 from app.logger import TraceLogger
-from app.pii import PII_FIELDS, mask_record
+from app.pii import PII_FIELDS
+
+
+class PIIBlockError(Exception):
+    def __init__(self, message: str, fields: list[str]) -> None:
+        super().__init__(message)
+        self.fields = fields
 
 
 class SQLExecutor:
@@ -19,7 +25,7 @@ class SQLExecutor:
         lowered = sql.lower().strip()
         is_select = lowered.startswith("select")
         if self.logger:
-            self.logger.log("stage_sql_guardrail_check", sql_preview=sql[:200], allowed=is_select)
+            self.logger.log("sql_guardrail_check_result", sql_preview=sql[:200], allowed=is_select)
         return is_select
 
     def _run_sql(self, sql: str) -> Tuple[List[str], List[Dict[str, Any]]]:
@@ -67,6 +73,16 @@ class SQLExecutor:
                     continue
                 self.logger.log("sql_execute", attempt=attempt, status="success", rows=len(masked_data))
                 return {"columns": columns, "rows": masked_data, "attempts": attempts}
+            except PIIBlockError as exc:
+                attempts.append({"attempt": attempt, "error": str(exc), "pii_fields": exc.fields})
+                self.logger.log(
+                    "sql_execute",
+                    attempt=attempt,
+                    status="blocked_pii",
+                    error=str(exc),
+                    fields=exc.fields,
+                )
+                return {"error": str(exc), "pii_fields": exc.fields, "attempts": attempts}
             except Exception as exc:  # sqlite errors are informative
                 err_msg = str(exc)
                 attempts.append({"attempt": attempt, "error": err_msg})
@@ -123,16 +139,15 @@ class SQLExecutor:
         pii_columns = [col for col in columns if col.lower() in PII_FIELDS]
         if not pii_columns:
             self.logger.log(
-                "stage_sql4_pii_guardrail",
+                "sql4_pii_guardrail_result",
                 applied=False,
                 rows=len(rows),
             )
             return rows
-        masked = [mask_record(row) for row in rows]
         self.logger.log(
-            "stage_sql4_pii_guardrail",
+            "sql4_pii_guardrail_result",
             applied=True,
             fields=pii_columns,
-            rows=len(masked),
+            rows=len(rows),
         )
-        return masked
+        raise PIIBlockError("Query includes PII columns; request blocked.", pii_columns)

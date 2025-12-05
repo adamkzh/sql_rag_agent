@@ -14,5 +14,5 @@ class LLMRouter:
     def classify(self, query: str) -> Dict[str, Any]:
         tools = self.llm.classify_tools(query, skip_policy_rule=True)
         if self.logger:
-            self.logger.log("stage_llm_router_result", **tools)
+            self.logger.log("llm_router_result", **tools)
         return tools

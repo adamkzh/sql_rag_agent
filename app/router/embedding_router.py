@@ -20,5 +20,5 @@ class EmbeddingRouter:
         Currently returns None to keep routing LLM-driven until embeddings are added.
         """
         if self.logger:
-            self.logger.log("stage_embedding_router", used=False, decision=None)
+            self.logger.log("embedding_router_result", used=False, decision=None)
         return None

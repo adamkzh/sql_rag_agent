@@ -55,7 +55,7 @@ class Router:
             "policy_keyword_hit": policy_hit,
             "embedding_decision": embedding_hint.get("decision") if embedding_hint else None,
         }
-        self.logger.log("stage_final_route", **payload)
+        self.logger.log("final_router_result", **payload)
         return payload
 
     def _infer_decision(self, requires_sql: bool, requires_policy: bool, unknown: bool) -> str:

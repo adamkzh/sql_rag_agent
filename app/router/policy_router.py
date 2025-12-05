@@ -12,5 +12,5 @@ class PolicyRouter:
         lowered = query.lower()
         hit = any(term in lowered for term in self.policy_terms)
         if self.logger:
-            self.logger.log("stage_policy_router", policy_keyword_hit=hit)
+            self.logger.log("policy_router_result", policy_keyword_hit=hit)
         return hit

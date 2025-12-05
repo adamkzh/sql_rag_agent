@@ -6,7 +6,7 @@ from app.docs_loader import DocsLoader
 from app.llm import LLMClient, LLMUnavailableError
 from app.logger import TraceLogger
 from app.router import Router
-from app.sql_executor import SQLExecutor
+from app.sql_executor import PIIBlockError, SQLExecutor
 
 
 class Agent:
@@ -25,15 +25,10 @@ class Agent:
 
     def handle(self, query: str) -> Dict[str, Any]:
         try:
-            self.logger.log("stage_agent_handle_start", query=query)
-            if self._is_pii_request(query):
-                self.logger.log("stage_pii_block", query=query, blocked=True, reason="raw PII requested")
-                return {
-                    "message": (
-                        "I'm sorry, I cannot share customer PII. "
-                        "I can provide aggregated or de-identified results instead."
-                    )
-                }
+            self.logger.log("agent_handle_start", query=query)
+            pii_terms = self._detect_pii_terms(query)
+            if pii_terms:
+                raise PIIBlockError("Raw PII requested; request blocked.", pii_terms)
 
             route_info = self.router.route(query)
             decision = str(route_info.get("decision") or "docs")
@@ -45,19 +40,35 @@ class Agent:
             if decision == "hybrid":
                 return self._handle_hybrid_case(query)
             return self._handle_sql_case(query)
+        except PIIBlockError as exc:
+            self.logger.log(
+                "pii_block_result",
+                query=query,
+                blocked=True,
+                fields=exc.fields,
+                reason=str(exc),
+            )
+            return {
+                "error": str(exc),
+                "pii_fields": exc.fields,
+                "message": (
+                    "I'm sorry, I cannot share customer PII. "
+                    "I can provide aggregated or de-identified results instead."
+                ),
+            }
         except LLMUnavailableError as exc:
             self.logger.log("llm_unavailable", message=str(exc))
             return {"message": str(exc)}
 
-    def _is_pii_request(self, query: str) -> bool:
+    def _detect_pii_terms(self, query: str) -> list[str]:
         lowered = query.lower()
-        return any(term in lowered for term in ["email", "phone", "address", "pii"])
+        return [term for term in ["email", "phone", "address", "pii"] if term in lowered]
 
     def _handle_docs_case(self, query: str) -> Dict[str, Any]:
-        context = self._retrieve_policy_context(query, stage="stage_doc1_policy_retrieval")
+        context = self._retrieve_policy_context(query, stage="doc1_policy_retrieval_result")
         answer = self.llm.answer_from_docs(query, context)
         self.logger.log(
-            "stage_doc_final_answer",
+            "doc_final_answer_result",
             mode="docs",
             query=query,
             has_context=bool(context.strip()),
@@ -70,11 +81,11 @@ class Agent:
         sql = self._generate_sql(
             query,
             schema=schema,
-            stage="stage_sql1_generation",
+            stage="sql1_generation_result",
         )
         result = self._run_sql_pipeline(sql, schema=schema, query=query)
         self.logger.log(
-            "stage_sql_final_answer",
+            "sql_final_answer_result",
             mode="sql",
             query=query,
             rows=len(result.get("rows", [])) if isinstance(result, dict) else 0,
@@ -83,9 +94,9 @@ class Agent:
         return {"result": result}
 
     def _handle_hybrid_case(self, query: str) -> Dict[str, Any]:
-        policy_context = self._retrieve_policy_context(query, stage="stage_h1_policy_extraction")
+        policy_context = self._retrieve_policy_context(query, stage="h1_policy_extraction_result")
         self.logger.log(
-            "stage_h1_policy_answer",
+            "h1_policy_answer_result",
             query=query,
             has_context=bool(policy_context.strip()),
             answer_preview=policy_context.strip()[:200],
@@ -95,11 +106,11 @@ class Agent:
             query,
             schema=schema,
             business_rule=policy_context,
-            stage="stage_h2_sql_generation",
+            stage="h2_sql_generation_result",
         )
         result = self._run_sql_pipeline(sql, schema=schema, query=query)
         self.logger.log(
-            "stage_h5_final_answer",
+            "h5_final_answer_result",
             mode="hybrid",
             query=query,
             rows=len(result.get("rows", [])) if isinstance(result, dict) else 0,
@@ -130,7 +141,7 @@ class Agent:
     def _run_sql_pipeline(self, sql: str, *, schema: str, query: str) -> Dict[str, Any]:
         sql_preview = sql.strip()[:200]
         self.logger.log(
-            "stage_sql2_self_correction_loop",
+            "sql2_self_correction_sql_execution_loop_start",
             query=query,
             max_attempts=3,
             sql_preview=sql_preview,
@@ -140,7 +151,7 @@ class Agent:
         rows = result.get("rows") if isinstance(result, dict) else None
         status = "success" if rows is not None else "error"
         self.logger.log(
-            "stage_sql3_sqlite_execution",
+            "sql3_sqlite_execution_result",
             query=query,
             status=status,
             rows=len(rows) if rows else 0,
