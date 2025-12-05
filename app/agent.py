@@ -122,12 +122,12 @@ class Agent:
         full_context = self.docs.extract_rule(query)
         selected = self.llm.select_policy_context(query, full_context, fallback=full_context)
         self.logger.log(
-            stage,
-            characters=len(selected),
+            "h2_llm_policy_context_selection_result",
+            selected=selected,
             has_context=bool(selected.strip()),
-            full_context_chars=len(full_context),
+            full_context_chars=full_context,
         )
-        return selected
+        return selected if selected else full_context
 
     def _generate_sql(self, query: str, *, schema: str, business_rule: str = "", stage: str) -> str:
         sql = self.llm.generate_sql(query, business_rule=business_rule, schema=schema)

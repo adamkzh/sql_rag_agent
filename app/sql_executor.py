@@ -66,10 +66,16 @@ class SQLExecutor:
                         }
                     sql = self.llm.correct_sql(
                         sql,
-                        "Query returned zero rows; please regenerate the SQL to return likely results.",
+                        "Query returned zero rows; please regenerate the SQL based on the schema and policy context to return correct results.",
                         schema=schema_text,
                     )
-                    self.logger.log("sql_retry_empty", attempt=attempt + 1, sql=sql)
+                    self.logger.log(
+                        "sql_retry_empty",
+                        attempt=attempt + 1,
+                        previous_attempt=attempt,
+                        sql=sql,
+                        cause="empty_result",
+                    )
                     continue
                 self.logger.log("sql_execute", attempt=attempt, status="success", rows=len(masked_data))
                 return {"columns": columns, "rows": masked_data, "attempts": attempts}
@@ -97,7 +103,13 @@ class SQLExecutor:
                 if attempt == max_attempts:
                     break
                 sql = self.llm.correct_sql(sql, err_msg, schema=schema_text)
-                self.logger.log("sql_retry", attempt=attempt + 1, sql=sql)
+                self.logger.log(
+                    "sql_retry",
+                    attempt=attempt + 1,
+                    previous_attempt=attempt,
+                    sql=sql,
+                    cause=err_msg,
+                )
         return {"error": f"Failed after {max_attempts} attempts", "attempts": attempts, "sql": original_sql}
 
     def schema_summary(self) -> str:

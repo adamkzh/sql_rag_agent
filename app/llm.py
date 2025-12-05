@@ -250,7 +250,7 @@ class LLMClient:
                 "role": "system",
                 "content": (
                     "You are a retrieval filter. Given a policy document and a user question, "
-                    "return ONLY relevant sentences/paragraphs from document regarding the question. "
+                    "return relevant sentences/paragraphs from document regarding the question. "
                     "Do not invent content. If nothing is relevant, return an empty string."
                 ),
             },
