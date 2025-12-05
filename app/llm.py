@@ -176,8 +176,7 @@ class LLMClient:
             "(e.g., VIP definition thresholds, date windows, spend minimums). "
             "Do not drop rule constraints even if the user query omits them. "
             "Use only the tables and columns listed in the provided schema. "
-            "If the request cannot be satisfied with the available tables, return a harmless placeholder query like "
-            "SELECT 'no matching table' AS message;"
+            "If the request cannot be satisfied with the available tables, return a empty string."
         )
         if schema:
             system += f"\nDatabase schema:\n{schema}"
