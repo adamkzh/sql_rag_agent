@@ -49,6 +49,34 @@ h1 {
   gap: 1rem;
 }
 
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 1.25rem;
+}
+
+.tab {
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.tab.active {
+  border-color: rgba(99, 102, 241, 0.6);
+  background: linear-gradient(135deg, #22d3ee, #6366f1);
+  color: #0f172a;
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.35);
+}
+
+.tab:not(.active):hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
 .panel {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -65,8 +93,36 @@ h1 {
   margin-bottom: 1rem;
 }
 
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .panel h2 {
   margin: 0.1rem 0;
+}
+
+.panel h3 {
+  margin: 0.15rem 0 0;
+}
+
+.ghost {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.ghost:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.ghost:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .form {
@@ -199,6 +255,13 @@ th {
   font-size: 0.75rem;
 }
 
+.pill.subtle {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  text-transform: none;
+  font-weight: 500;
+}
+
 .timestamp {
   font-size: 0.8rem;
   color: #94a3b8;
@@ -228,6 +291,41 @@ th {
   color: #e2e8f0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.table-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.table-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.8rem;
+}
+
+.table-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.policy-card {
+  margin-top: 0.6rem;
+  padding: 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.policy-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
 @media (max-width: 900px) {
